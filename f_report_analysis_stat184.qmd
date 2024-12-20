@@ -1,0 +1,373 @@
+---
+title: "LEGO Set Analysis Report"
+author: "Rohan Badami, Ashmit Jha, Anisha Parida"
+format: html
+editor: visual
+---
+
+# Group Project 6 Pseudocode / Analysis planning. 
+#
+# 1. set up and imports :
+
+# 2. data inspection and cleaning:
+#    - check structure, summary stats.
+#    - handle missing values and duplicates.
+#    - create new variables (e.g., msrp_per_piece).
+#/Users/rohanbadami/f_report_analysis_stat184.qmd
+# 3. EDA:
+#    -  we plan to calculate the minimum, maximum, mean, median, and standard deviation to understand the overall price range of LEGO sets, as well as their central tendencies and variability.
+#    - Create professional summaries (tables and visualizations).
+#
+# 4. visualizations:
+#    - Histograms for rating distribution.
+#    - Line plots for MSRP over time.
+#    - Scatter plots for price vs. piece count.
+#    - Bar charts for top themes.
+#    - Correlation heatmap for numeric variables.
+#
+# 5. open science and FAIR/CARE principles 
+#    - Code structured so others can run it if they have "data/sets.csv".
+#    - Discuss FAIR/CARE principles in comments.
+#
+# 6. CONCLUSIONS & FUTURE WORK:
+#    - Summarize findings.
+#    - Mention alternative approaches and improvements.
+---
+
+```{r}
+# Load and install required packages. In a real workflow, installation would be done outside this script.
+packages <- c("tidyverse", "ggplot2","dplyr","gt","ggcorrplot")
+lapply(packages, library, character.only = TRUE)
+options(repos = c(CRAN = "https://cran.rstudio.com/"))
+
+# setting a consistent theme for plots
+theme_set(theme_minimal(base_size = 15))
+
+```
+
+```{r}
+
+packages <- c("tidyverse", "ggplot2","dplyr") 
+lapply(packages, library, character.only = TRUE)
+options(repos = c(CRAN = "https://cran.rstudio.com/"))
+
+legoData <- read.csv("~/Downloads/LEGO Data/sets.csv", header = TRUE, stringsAsFactors = FALSE)
+
+#Inspect the structure of the data
+str(legoData)
+# Display summary statistics
+summary(legoData)
+# View the first few rows
+head(legoData)
+
+
+# Check for missing values
+total_na <- sum(is.na(legoData))
+cat("missing values in the dataset", total_na)
+
+# Remove rows with any NA values
+lego_data_clean <- legoData %>%
+  drop_na()
+
+# Remove duplicate rows
+lego_data_clean <- lego_data_clean %>%
+  distinct()
+
+# Create a new column: price_per_piece
+lego_data_clean <- lego_data_clean %>%
+  mutate(price_per_piece = Current_Price / Pieces)
+
+# Remove sets with zero pieces for accurate analysis
+lego_data_clean <- lego_data_clean %>%
+  filter(Pieces > 0)
+
+
+# Verify the cleaned data
+str(lego_data_clean)
+summary(lego_data_clean)
+
+
+legoData <- legoData[!duplicated(legoData), ]
+
+legoData <- legoData %>%
+  mutate(msrp_per_piece = ifelse(Pieces > 0, USD_MSRP / Pieces, NA))
+
+
+# Calculate summary statistics
+stats_summary <- legoData %>%
+  summarize(
+    min_usd_msrp = min(USD_MSRP, na.rm = TRUE),
+    max_usd_msrp = max(USD_MSRP, na.rm = TRUE),
+    mean_usd_msrp = mean(USD_MSRP, na.rm = TRUE),
+    median_usd_msrp = median(USD_MSRP, na.rm = TRUE),
+    sd_usd_msrp = sd(USD_MSRP, na.rm = TRUE),
+    min_pieces = min(Pieces, na.rm = TRUE),
+    max_pieces = max(Pieces, na.rm = TRUE),
+    mean_pieces = mean(Pieces, na.rm = TRUE),
+    median_pieces = median(Pieces, na.rm = TRUE),
+    sd_pieces = sd(Pieces, na.rm = TRUE),
+    min_msrp_per_piece = min(msrp_per_piece, na.rm = TRUE),
+    max_msrp_per_piece = max(msrp_per_piece, na.rm = TRUE),
+    mean_msrp_per_piece = mean(msrp_per_piece, na.rm = TRUE),
+    median_msrp_per_piece = median(msrp_per_piece, na.rm = TRUE),
+    sd_msrp_per_piece = sd(msrp_per_piece, na.rm = TRUE),
+    min_rating = min(Rating, na.rm = TRUE),
+    max_rating = max(Rating, na.rm = TRUE),
+    mean_rating = mean(Rating, na.rm = TRUE),
+    median_rating = median(Rating, na.rm = TRUE),
+    sd_rating = sd(Rating, na.rm = TRUE)
+  ) 
+
+# Display the summary table using gt
+install.packages("gt", repos = "https://cran.rstudio.com/")
+library(gt)
+
+stats_summary %>%
+  gt() %>%
+  tab_header(
+    title = "Descriptive Statistics of LEGO Set Prices, Piece Counts, and Ratings"
+  ) %>%
+  fmt_number(
+    columns = everything(),
+    decimals = 2
+  ) %>%
+  cols_label(
+    min_usd_msrp = "Min MSRP (USD)",
+    max_usd_msrp = "Max MSRP (USD)",
+    mean_usd_msrp = "Mean MSRP (USD)",
+    median_usd_msrp = "Median MSRP (USD)",
+    sd_usd_msrp = "SD MSRP (USD)",
+    min_pieces = "Min Pieces",
+    max_pieces = "Max Pieces",
+    mean_pieces = "Mean Pieces",
+    median_pieces = "Median Pieces",
+    sd_pieces = "SD Pieces",
+    min_msrp_per_piece = "Min Price/Piece (USD)",
+    max_msrp_per_piece = "Max Price/Piece (USD)",
+    mean_msrp_per_piece = "Mean Price/Piece (USD)",
+    median_msrp_per_piece = "Median Price/Piece (USD)",
+    sd_msrp_per_piece = "SD Price/Piece (USD)",
+    min_rating = "Min Rating",
+    max_rating = "Max Rating",
+    mean_rating = "Mean Rating",
+    median_rating = "Median Rating",
+    sd_rating = "SD Rating"
+  )
+
+
+library(dplyr)  # For the %>% operator
+library(ggplot2)  # For visualization
+
+
+# we wanted to visualize distribution of ratings (only for sets with rating > 0)
+# ensurde chosen colors and layout are accessible and clear.
+
+rated_legoData <- legoData %>% 
+  filter(Rating > 0)
+
+# created a histogram for rated LEGO sets
+ggplot(data = rated_legoData, aes(x = Rating)) +
+  geom_histogram(binwidth = 0.2, fill = "blue", color = "black", alpha = 0.7) +
+  labs(
+    title = "Distribution of Ratings for Rated LEGO Sets",
+    x = "Rating",
+    y = "Frequency"
+  ) +
+  theme_minimal()
+
+
+
+# calculated average USD_MSRP per year
+avg_msrp_year <- legoData %>%
+  group_by(Year) %>%
+  summarize(avg_msrp = mean(USD_MSRP, na.rm = TRUE))
+
+# Plot the overall pricing trend
+ggplot(data = avg_msrp_year, aes(x = Year, y = avg_msrp)) +
+  geom_line(color = "#1f78b4") +
+  geom_point(color = "#33a02c") +
+  labs(
+    title = "Average LEGO Set MSRP Over Time (All Years)",
+    x = "Year",
+    y = "Average MSRP (USD)"
+  ) +
+  theme_minimal()
+
+
+
+# filter data for 2010-2020
+avg_msrp_focused <- avg_msrp_year %>%
+  filter(Year >= 2010 & Year <= 2020)
+
+# plot the focused pricing trend
+ggplot(data = avg_msrp_focused, aes(x = Year, y = avg_msrp)) +
+  geom_line(color = "#6a3d9a", size = 1) +
+  geom_point(size = 3, color = "#e31a1c") +
+  geom_area(fill = "#cab2d6", alpha = 0.3) +
+  labs(
+    title = "Average LEGO Set MSRP (2010 - 2020)",
+    x = "Year",
+    y = "Average MSRP (USD)"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.title = element_text(face = "bold")
+  )
+
+
+correlation_value <- cor(
+  legoData$USD_MSRP, 
+  legoData$Pieces, 
+  use = "complete.obs",
+  method = "pearson"
+)
+
+ggplot(data = legoData, aes(x = Pieces, y = USD_MSRP)) +
+  geom_point(alpha = 0.5, color = "green") +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(
+    title = "Price vs. Piece Count",
+    x = "Piece Count",
+    y = "MSRP (USD)"
+  ) +
+  theme_minimal()
+
+
+avg_msrp_theme <- lego_data_clean %>%
+  group_by(Theme) %>%
+  summarize(avg_msrp = mean(USD_MSRP, na.rm = TRUE)) %>%
+  arrange(desc(avg_msrp))
+
+
+# top 20 most expensive themes for better visualization
+top20_themes <- avg_msrp_theme %>%
+  slice_max(order_by = avg_msrp, n = 20)
+
+# horizontal bar chart for top 20 themes
+ggplot(data = top20_themes, aes(x = reorder(Theme, avg_msrp), y = avg_msrp)) +
+  geom_bar(stat = "identity", fill = "#6baed6", color = "black") +
+  coord_flip() +
+  labs(
+    title = "Top 20 LEGO Themes by Average Set MSRP",
+    x = "Theme",
+    y = "Average MSRP (USD)"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.title = element_text(face = "bold"),
+    axis.text.y = element_text(size = 10)  # Adjust y-axis text size
+  )
+
+
+avg_price_by_theme <- legoData %>%
+  group_by(Theme) %>%
+  summarize(avg_price = mean(Current_Price, na.rm = TRUE)) %>%
+  arrange(desc(avg_price))
+
+avg_price_by_theme %>%
+  print()
+
+
+
+
+lego_data_clean <- lego_data_clean %>%
+  mutate(msrp_per_piece = ifelse(Pieces > 0, USD_MSRP / Pieces, NA))
+
+# filter data for top themes
+top_themes <- lego_data_clean %>%
+  filter(Theme %in% c("Advanced models", "The Simpsons", "Creator Expert"))
+
+# summarize data for overall and top themes
+overall_summary <- lego_data_clean %>%
+  summarize(
+    mean_pieces = mean(Pieces, na.rm = TRUE),
+    mean_price_per_piece = mean(msrp_per_piece, na.rm = TRUE)
+  ) %>%
+  mutate(Category = "Overall")
+
+theme_summary <- top_themes %>%
+  group_by(Theme) %>%
+  summarize(
+    mean_pieces = mean(Pieces, na.rm = TRUE),
+    mean_price_per_piece = mean(msrp_per_piece, na.rm = TRUE)
+  ) %>%
+  rename(Category = Theme)
+
+# combine summaries
+comparison_summary <- rbind(overall_summary, theme_summary)
+
+# melt data for visualization
+comparison_long <- comparison_summary %>%
+  pivot_longer(
+    cols = c(mean_pieces, mean_price_per_piece), # columns to reshape
+    names_to = "variable",                       # new column for variable names
+    values_to = "value"                          # new column for values
+  )
+
+
+# Plot comparison
+ggplot(comparison_long, aes(x = Category, y = value, fill = Category)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  facet_wrap(~variable, scales = "free") +
+  labs(
+    title = "Comparison of Piece Count and Price Per Piece: Top Expensive Themes vs. Overall",
+    x = "Category",
+    y = "Value"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.title = element_text(face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "none"
+  )
+
+
+install.packages("ggcorrplot")
+library(ggcorrplot)
+
+# Select relevant numeric columns
+numeric_cols <- lego_data_clean %>%
+  select(USD_MSRP, Pieces, msrp_per_piece, Rating, Minifigures, Total_Quantity)
+
+# Compute correlation matrix
+cor_matrix <- cor(numeric_cols, use = "complete.obs")
+
+# Visualize correlation matrix
+ggcorrplot(cor_matrix, 
+           method = "circle",
+           type = "lower",
+           lab = TRUE,
+           lab_size = 3,
+           colors = c("red", "white", "blue"),
+           title = "Correlation Matrix of LEGO Set Variables",
+           ggtheme = theme_minimal(base_size = 15))
+
+# calculating average MSRP by Theme and Year
+avg_msrp_theme_year <- lego_data_clean %>%
+  group_by(Theme, Year) %>%
+  summarize(avg_msrp = mean(USD_MSRP, na.rm = TRUE)) %>%
+  ungroup()
+
+# creating
+ggplot(avg_msrp_theme_year, aes(x = Year, y = Theme, fill = avg_msrp)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient(low = "lightyellow", high = "red") +
+  labs(
+    title = "Heatmap of Average LEGO Set MSRP by Theme and Year",
+    x = "Year",
+    y = "Theme",
+    fill = "Avg MSRP (USD)"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.text.y = element_text(size = 8)
+  )
+
+
+
+
+```
